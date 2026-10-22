@@ -59,6 +59,15 @@
             ]
         },
         {
+            "path": "email",
+            "types": [
+                "string"
+            ],
+            "sample_values": [
+                "vikas@example.com"
+            ]
+        },
+        {
             "path": "gpa",
             "types": [
                 "double"
@@ -82,6 +91,15 @@
                 "Amit",
                 "Sneha",
                 "Neha"
+            ]
+        },
+        {
+            "path": "phone",
+            "types": [
+                "string"
+            ],
+            "sample_values": [
+                "9876543210"
             ]
         },
         {
