@@ -4,3 +4,7 @@ pydantic-settings
 python-dotenv
 fastapi
 uvicorn
+streamlit
+chromadb
+sentence-transformers
+requests
