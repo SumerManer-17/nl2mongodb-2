@@ -34,13 +34,34 @@ def get_latest_snapshot():
 
 
 def check_schema_changes():
+    """Compare the live DB schema against the latest snapshot.
+
+    Returns a dict describing the latest version, detected changes, and any
+    newly created version.  Never returns ``None`` so callers can rely on the
+    result.
+    """
+    result = {
+        "latest_version": None,
+        "changes": None,
+        "has_changes": False,
+        "created": None,
+        "new_version": None,
+        "message": "",
+    }
+
     latest_path, latest_version = get_latest_snapshot()
 
     if latest_path is None:
         print("No previous snapshot found. Creating the first snapshot.")
         current_schema = extract_collection_schema(COLLECTION_NAME)
         save_schema_version(current_schema, "v1")
-        return
+        result["latest_version"] = "v1"
+        result["created"] = "v1"
+        result["has_changes"] = False
+        result["message"] = "No previous snapshot. Created students_v1.json."
+        return result
+
+    result["latest_version"] = f"v{latest_version}"
 
     old_schema = load_schema(str(latest_path))
     current_schema = extract_collection_schema(COLLECTION_NAME)
@@ -50,21 +71,32 @@ def check_schema_changes():
         current_schema.model_dump(),
     )
 
+    result["changes"] = changes
+
     has_changes = any([
         changes["added_fields"],
         changes["removed_fields"],
         changes["changed_types"],
     ])
 
+    result["has_changes"] = has_changes
+
     if not has_changes:
         print("No schema changes detected.")
-        return
+        result["message"] = "No schema changes detected."
+        return result
 
     print("Schema changes detected:")
     print(changes)
 
     next_version = latest_version + 1
     save_schema_version(current_schema, f"v{next_version}")
+
+    result["new_version"] = f"v{next_version}"
+    result["message"] = (
+        f"Schema changes detected. Created students_v{next_version}.json."
+    )
+    return result
 
 
 if __name__ == "__main__":
