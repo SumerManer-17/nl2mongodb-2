@@ -35,8 +35,13 @@ pip install -r requirements.txt
 
 # 3. Confirm your environment variables
 #    .env already contains MONGODB_URI and MONGODB_DATABASE.
-#    Optionally set OLLAMA_MODEL to a larger local model, e.g.:
+#    Model: the bundled qwen2.5:0.5b is small and can hallucinate on
+#    alternate phrasings. For more reliable generation, pull and use a larger
+#    local model (retry the download if it previously failed):
+#      ollama pull qwen2.5:3b
 #      $env:OLLAMA_MODEL="qwen2.5:3b"
+#    Set OLLAMA_MODEL before launching the app. qwen2.5:7b is better still if
+#    you have enough RAM.
 ```
 
 Never commit `.env`, `venv/`, `__pycache__/`, or `chroma_db/` (they are in
@@ -133,12 +138,20 @@ tests/
 
 ## Known limitations
 
-- The bundled `qwen2.5:0.5b` model is small and can occasionally produce
-  malformed output; the parser/validator handles this by reporting a clear
-  error rather than executing a bad query. For more reliable generation, use a
-  larger local model (e.g. `qwen2.5:3b`) and set `OLLAMA_MODEL`.
-- Query generation is currently English-only. Multilingual (Hindi/Marathi and
-  code-mixed) support is a future milestone.
+- The bundled `qwen2.5:0.5b` model is small and can occasionally hallucinate
+  extra fields/values on alternate phrasings (e.g. it once emitted a wrong
+  `name` for "Student who knows java"). The prompt was hardened and the
+  parser/validator still catch malformed/unsafe output. For reliable
+  generation use a larger local model (`qwen2.5:3b` or `qwen2.5:7b`) and set
+  `OLLAMA_MODEL`.
+- **Marathi / Hindi / code-mixed: NOT reliable for the demo.** Simple
+  equality sometimes works by chance, but complex queries fail (e.g. a Marathi
+  GPA query returned the wrong field). The embedding model
+  `all-MiniLM-L6-v2` is English-centric and the `0.5b` LLM is too weak for
+  Indian languages. To support multilingual later, swap the embeddings to
+  `paraphrase-multilingual-MiniLM-L12-v2`, re-index ChromaDB, and use a
+  larger Qwen model — planned as a future milestone.
+- Query generation is currently English-only for the demonstration.
 - The demo generates `find()` filters only — no aggregation pipelines or write
   operations.
 - Do not run `backend/database/seed.py` during the presentation: it calls

@@ -49,15 +49,29 @@ def test_generate_and_execute():
         if err:
             failures.append(f"{question}: generation error: {err}")
             continue
-        if actual != expected:
+        if actual is None:
+            failures.append(f"{question}: no filter produced")
+            continue
+        # academic.department and flat department both match Vikas; accept either.
+        acceptable = expected
+        if expected == {"academic.department": "CSE"}:
+            acceptable = [{"academic.department": "CSE"}, {"department": "CSE"}]
+        if isinstance(acceptable, dict) and actual != acceptable:
             failures.append(
                 f"{question}: expected {expected}, got {actual}"
             )
             continue
+        if isinstance(acceptable, list) and actual not in acceptable:
+            failures.append(
+                f"{question}: expected one of {acceptable}, got {actual}"
+            )
+            continue
         records, meta = execute_filter(actual)
-        if meta["returned"] == 0 and expected != {"skills": "Python"}:
-            # most queries should return results
-            pass
+        # every case should return at least Vikas (student_id 106)
+        if not any(r.get("student_id") == 106 for r in records):
+            failures.append(
+                f"{question}: expected Vikas in results, got {records}"
+            )
     assert not failures, "\n".join(failures)
 
 
