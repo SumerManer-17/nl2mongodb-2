@@ -23,6 +23,7 @@ from backend.database.mongodb import get_database
 from backend.rag.schema_retriever import load_latest_schema, retrieve_schema
 from backend.query.query_validator import normalize_filter, FilterValidationError
 from backend.query import llm_client
+from backend.query.marathi_preprocessor import preprocess_question
 
 
 class QueryGenerationError(RuntimeError):
@@ -88,8 +89,9 @@ def _build_prompt(question: str, schema: Dict[str, Any], context: List[Dict[str,
     lines.append("  6. For array membership (e.g. skills contains Python) use {\"skills\": \"Python\"}.")
     lines.append('  7. To check a field exists (e.g. has an email) use {"email": {"$exists": true}}.')
     lines.append("  8. For nested fields use dotted paths, e.g. {\"academic.gpa\": {\"$gt\": 8}}.")
-    lines.append("  9. Output a single raw JSON object. Do not wrap it in {\"filter\": ...}.")
-    lines.append(" 10. Do not use $where, $eval, or any write/update/delete operators.")
+    lines.append('  9. For case-insensitive text search (e.g. student likes painting) use {"hobby": {"$regex": "^painting$", "$options": "i"}}.')
+    lines.append(" 10. Output a single raw JSON object. Do not wrap it in {\"filter\": ...}.")
+    lines.append(" 11. Do not use $where, $eval, or any write/update/delete operators.")
     lines.append("")
     lines.append("EXAMPLES:")
     lines.append('  Q: Find students from Pune')
@@ -104,6 +106,8 @@ def _build_prompt(question: str, schema: Dict[str, Any], context: List[Dict[str,
     lines.append('  A: {"skills": "Java"}')
     lines.append('  Q: Find students with email addresses')
     lines.append('  A: {"email": {"$exists": true}}')
+    lines.append('  Q: Student like to paint')
+    lines.append('  A: {"hobby": {"$regex": "^paint", "$options": "i"}}')
     lines.append("")
     lines.append(f"QUESTION: {question}")
     lines.append("FILTER:")
@@ -154,6 +158,11 @@ def _extract_json_object(text: str) -> Any:
     raise QueryGenerationError("Model response did not contain a valid JSON object.")
 
 
+def _translate_if_marathi(question: str) -> str:
+    """Translate Marathi (Devanagari) input to English before generation."""
+    return preprocess_question(question)
+
+
 def generate_filter(question: str) -> Dict[str, Any]:
     """Generate a validated MongoDB filter for a natural-language question.
 
@@ -161,6 +170,8 @@ def generate_filter(question: str) -> Dict[str, Any]:
     if the model is unavailable, returns malformed output, or the filter fails
     schema validation.
     """
+    question = _translate_if_marathi(question)
+
     if not llm_client.is_available():
         raise QueryGenerationError(
             "Ollama is not reachable. Start Ollama (`ollama serve`) and confirm "
@@ -202,6 +213,8 @@ def generate_filter_with_metadata(question: str) -> Dict[str, Any]:
     Returns a dict with keys:
       filter, question, model, schema_version, retrieved_fields, raw_response.
     """
+    question = _translate_if_marathi(question)
+
     if not llm_client.is_available():
         raise QueryGenerationError(
             "Ollama is not reachable. Start Ollama (`ollama serve`) and confirm "

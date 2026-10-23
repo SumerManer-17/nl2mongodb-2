@@ -10,7 +10,7 @@ from __future__ import annotations
 from typing import Any, Dict, List, Tuple
 
 # Operators permitted inside a field condition (e.g. {"gpa": {"$gt": 8}}).
-_FIELD_OPERATORS = {"$gt", "$gte", "$lt", "$lte", "$eq", "$ne", "$in", "$nin", "$exists"}
+_FIELD_OPERATORS = {"$gt", "$gte", "$lt", "$lte", "$eq", "$ne", "$in", "$nin", "$exists", "$regex", "$options"}
 
 # Logical operators permitted at the top level (and nested inside $and/$or).
 _LOGICAL_OPERATORS = {"$and", "$or"}
@@ -165,6 +165,14 @@ def normalize_filter(
                         f"Unsupported operator '{op_key}' on field '{field}'. "
                         f"Allowed: {sorted(_FIELD_OPERATORS)}."
                     )
+                # $regex must be case-insensitive and used only on strings.
+                if op == "$regex":
+                    if not isinstance(op_val, str):
+                        raise FilterValidationError(
+                            f"$regex on field '{field}' expects a string value."
+                        )
+                    if "$options" not in cond or cond["$options"] != "i":
+                        cond["$options"] = "i"
                 cond[op] = op_val
             normalized[field] = cond
         else:

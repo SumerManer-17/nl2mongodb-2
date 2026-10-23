@@ -33,6 +33,20 @@ def _sanitize_document(doc: Dict[str, Any]) -> Dict[str, Any]:
     return sanitized
 
 
+def _make_case_insensitive(filter_dict: Dict[str, Any]) -> Dict[str, Any]:
+    """Convert string equality conditions to case-insensitive $regex.
+
+    { "hobby": "painting" } -> { "hobby": { "$regex": "^painting$", "$options": "i" } }
+    """
+    ci: Dict[str, Any] = {}
+    for field, value in filter_dict.items():
+        if isinstance(value, str):
+            ci[field] = {"$regex": f"^{value}$", "$options": "i"}
+        else:
+            ci[field] = value
+    return ci
+
+
 def execute_filter(
     filter_dict: Dict[str, Any],
     *,
@@ -67,9 +81,24 @@ def execute_filter(
     results = [_sanitize_document(doc) for doc in cursor]
     elapsed_ms = (time.perf_counter() - start) * 1000
 
+    # Case-insensitive fallback: if exact string match returned nothing,
+    # retry with case-insensitive regex so "paint" matches "Painting".
+    if not results:
+        ci_filter = _make_case_insensitive(filter_dict)
+        if ci_filter != filter_dict:
+            start = time.perf_counter()
+            cursor = collection.find(ci_filter).limit(limit)
+            results = [_sanitize_document(doc) for doc in cursor]
+            elapsed_ms = (time.perf_counter() - start) * 1000
+            metadata_filter = ci_filter
+        else:
+            metadata_filter = filter_dict
+    else:
+        metadata_filter = filter_dict
+
     metadata = {
         "collection": collection_name,
-        "filter": filter_dict,
+        "filter": metadata_filter,
         "limit": limit,
         "returned": len(results),
         "execution_time_ms": round(elapsed_ms, 2),
